@@ -1,23 +1,30 @@
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace _6osa
 {
-    // Ainult .cs fail - XAML faili pole vaja, kustuta ContactPage.xaml kui see on olemas
     public partial class ContactPage : ContentPage
     {
-        // --- Kõik elemendid ---
-        EntryCell? nimeCell;
-        EntryCell? emailCell;
-        EntryCell? telefonCell;
-        EntryCell? kirjeldusCell;
-        EntryCell? sõnumCell;
-        SwitchCell? sc;
-        ImageCell? ic;
-        TableSection? fotoSection;
+        Entry? nimeEntry;
+        Entry? emailEntry;
+        Entry? telefonEntry;
+        Entry? kirjeldusEntry;
+        Entry? sõnumEntry;
+        Image? fotoImage;
         Label? tervitusLabel;
-        TableView? tabelview;
+        Picker? tervitusPicker;
 
-        // --- Tervituste nimekiri ---
+        readonly Color põhiVärv = Color.FromArgb("#6C63FF");
+        readonly Color teineVärv = Color.FromArgb("#FF6584");
+        readonly Color roheVärv = Color.FromArgb("#43C59E");
+        readonly Color taustaVärv = Color.FromArgb("#F4F3FF");
+        readonly Color kaartVärv = Colors.White;
+        readonly Color tekstVärv = Color.FromArgb("#2D2B55");
+        readonly Color hallVärv = Color.FromArgb("#9B99B5");
+
+        bool fotoNähtav = false;
+        string valitudTervitus = "";
+
         readonly List<string> tervitused = new List<string>
         {
             "🎂 Palju õnne sünnipäevaks! Soovin sulle kõike paremat!",
@@ -29,270 +36,386 @@ namespace _6osa
             "🌟 Sa oled täiesti eriline inimene! 🌟"
         };
 
-        string valitudTervitus = "";
-
         public ContactPage()
         {
-            Title = "Sõbrade kontaktiraamat";
-            EhitaTabel();
+            Title = "Kontaktiraamat";
+            BackgroundColor = taustaVärv;
+            EhitaLeht();
         }
 
-        void EhitaTabel()
+        protected override void OnAppearing()
         {
-            // --- Sõbra andmed ---
-            nimeCell = new EntryCell { Label = "Nimi", Placeholder = "Sisesta sõbra nimi" };
-            emailCell = new EntryCell { Label = "Email", Placeholder = "Sisesta email", Keyboard = Keyboard.Email };
-            telefonCell = new EntryCell { Label = "Telefon", Placeholder = "Sisesta tel. number", Keyboard = Keyboard.Telephone };
-            kirjeldusCell = new EntryCell { Label = "Kirjeldus", Placeholder = "Kirjeldus sõbra kohta" };
-
-            var andmedSection = new TableSection("Sõbra andmed")
+            base.OnAppearing();
+            Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(300), () =>
             {
-                nimeCell, emailCell, telefonCell, kirjeldusCell
+                nimeEntry?.Focus();
+            });
+        }
+
+        void EhitaLeht()
+        {
+            var leht = new VerticalStackLayout
+            {
+                Padding = new Thickness(16, 12),
+                Spacing = 16
             };
 
-            // --- Foto toggle ---
-            sc = new SwitchCell { Text = "Näita fotot" };
-            sc.OnChanged += Sc_OnChanged;
-
-            ic = new ImageCell
+            leht.Add(new Label
             {
-                ImageSource = ImageSource.FromFile("dotnet_bot.png"),
-                Text = "Sõbra foto",
-                Detail = "Foto kirjeldus"
+                Text = "👥 Sõbrade kontaktiraamat",
+                FontSize = 22,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = tekstVärv,
+                HorizontalOptions = LayoutOptions.Center,
+                Margin = new Thickness(0, 8, 0, 0)
+            });
+
+            nimeEntry = TeeEntry("Sõbra nimi", "👤", Keyboard.Default);
+            emailEntry = TeeEntry("Email", "📧", Keyboard.Email);
+            telefonEntry = TeeEntry("Telefoninumber", "📞", Keyboard.Telephone);
+            kirjeldusEntry = TeeEntry("Kirjeldus sõbra kohta", "📝", Keyboard.Default);
+
+            leht.Add(TeeKaart("👤 Sõbra andmed", põhiVärv, new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children = { nimeEntry, emailEntry, telefonEntry, kirjeldusEntry }
+            }));
+
+            fotoImage = new Image
+            {
+                Source = ImageSource.FromFile("dotnet_bot.png"),
+                HeightRequest = 160,
+                Aspect = Aspect.AspectFill,
+                IsVisible = false
             };
 
-            var switchSection = new TableSection("Foto") { sc };
-            fotoSection = new TableSection("");
-
-            // --- Sõnumi saatmine ---
-            sõnumCell = new EntryCell { Label = "Sõnum", Placeholder = "Kirjuta sõnum siia" };
-
-            var nupudView = new ViewCell
+            var fotoToggle = new Switch
             {
-                View = new HorizontalStackLayout
+                IsToggled = false,
+                OnColor = põhiVärv
+            };
+            var fotoToggleLabel = new Label
+            {
+                Text = "Näita fotot",
+                TextColor = tekstVärv,
+                FontSize = 15,
+                VerticalOptions = LayoutOptions.Center
+            };
+            fotoToggle.Toggled += (s, e) =>
+            {
+                fotoNähtav = e.Value;
+                fotoImage.IsVisible = fotoNähtav;
+                fotoToggleLabel.Text = fotoNähtav ? "Peida foto" : "Näita fotot";
+            };
+
+            var toggleRida = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                Children = { fotoToggleLabel, fotoToggle }
+            };
+
+            var fotoNupud = new HorizontalStackLayout
+            {
+                Spacing = 10,
+                Children =
                 {
-                    Padding = new Thickness(15, 8),
-                    Spacing = 8,
-                    Children =
-                    {
-                        TeeBtnNupp("📞 Helista", "#6200EE", Helista_Clicked),
-                        TeeBtnNupp("💬 SMS",     "#6200EE", Saada_sms_Clicked),
-                        TeeBtnNupp("📧 Email",   "#6200EE", Saada_email_Clicked)
-                    }
+                    TeeNupp(" Teen foto",  põhiVärv, TeeFoto_Clicked),
+                    TeeNupp(" Valin foto", põhiVärv, ValiGaleriist_Clicked)
                 }
             };
 
-            var sõnumSection = new TableSection("Saada sõnum") { sõnumCell, nupudView };
+            leht.Add(TeeKaart(" Foto", põhiVärv, new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children = { toggleRida, fotoNupud, fotoImage }
+            }));
 
-            // --- Juhuslik tervitus ---
+            // ── KAART: Saada sõnum ────────────────────────────
+            sõnumEntry = TeeEntry("Kirjuta sõnum siia...", "💬", Keyboard.Default);
+
+            var sõnumNupud = new FlexLayout
+            {
+                Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+                JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+                AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center,
+                Direction = Microsoft.Maui.Layouts.FlexDirection.Row
+            };
+            sõnumNupud.Add(TeeNuppMargin(" Helista", põhiVärv, Helista_Clicked));
+            sõnumNupud.Add(TeeNuppMargin(" SMS", põhiVärv, Saada_sms_Clicked));
+            sõnumNupud.Add(TeeNuppMargin("Email", põhiVärv, Saada_email_Clicked));
+
+            leht.Add(TeeKaart(" Saada sõnum", põhiVärv, new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children = { sõnumEntry, sõnumNupud }
+            }));
+
+            // ── KAART: Juhuslik tervitus ──────────────────────
             tervitusLabel = new Label
             {
-                Text = "Vajuta nuppu, et valida juhuslik tervitus",
+                Text = "Vali tervitus nimekirjast või vajuta juhuslik 🎲",
                 FontSize = 13,
-                TextColor = Colors.Gray,
-                LineBreakMode = LineBreakMode.WordWrap,
-                Margin = new Thickness(0, 0, 0, 6)
+                TextColor = hallVärv,
+                LineBreakMode = LineBreakMode.WordWrap
             };
 
-            var tervitusValikView = new ViewCell
+            tervitusPicker = new Picker
             {
-                View = new VerticalStackLayout
+                Title = " Vali tervitus...",
+                TextColor = tekstVärv,
+                TitleColor = hallVärv,
+                BackgroundColor = taustaVärv
+            };
+            foreach (var t in tervitused)
+                tervitusPicker.Items.Add(t);
+            tervitusPicker.SelectedIndexChanged += (s, e) =>
+            {
+                if (tervitusPicker.SelectedIndex >= 0)
                 {
-                    Padding = new Thickness(15, 10),
-                    Spacing = 8,
-                    Children =
+                    valitudTervitus = tervitused[tervitusPicker.SelectedIndex];
+                    if (tervitusLabel != null)
                     {
-                        tervitusLabel,
-                        TeeBtnNupp("🎲 Vali juhuslik tervitus", "#03DAC6", ValiTervitus_Clicked)
+                        tervitusLabel.Text = $"✅ {valitudTervitus}";
+                        tervitusLabel.TextColor = roheVärv;
                     }
                 }
             };
 
-            var tervitusSaatmineView = new ViewCell
+            var pickerBorder = new Border
             {
-                View = new HorizontalStackLayout
-                {
-                    Padding = new Thickness(15, 8),
-                    Spacing = 8,
-                    Children =
-                    {
-                        TeeBtnNupp("📱 Tervitus SMS",   "#018786", SaadaTervitusSms_Clicked),
-                        TeeBtnNupp("✉️ Tervitus Email", "#018786", SaadaTervitusEmail_Clicked)
-                    }
-                }
+                Stroke = põhiVärv,
+                StrokeThickness = 1.5,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(10) },
+                Padding = new Thickness(4, 0),
+                Content = tervitusPicker
             };
 
-            var tervitusSection = new TableSection("🎉 Juhuslik tervitus")
+            var tervitusNupud = new FlexLayout
             {
-                tervitusValikView, tervitusSaatmineView
+                Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+                JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+                Direction = Microsoft.Maui.Layouts.FlexDirection.Row
             };
+            tervitusNupud.Add(TeeNuppMargin("🎲 Juhuslik", roheVärv, ValiTervitus_Clicked));
+            tervitusNupud.Add(TeeNuppMargin("📱 Tervitus SMS", teineVärv, SaadaTervitusSms_Clicked));
+            tervitusNupud.Add(TeeNuppMargin("✉️ Tervitus Email", teineVärv, SaadaTervitusEmail_Clicked));
 
-            // --- Pane tabel kokku ---
-            tabelview = new TableView
+            leht.Add(TeeKaart("🎉 Juhuslik tervitus", roheVärv, new VerticalStackLayout
             {
-                Intent = TableIntent.Form,
-                Root = new TableRoot
-                {
-                    andmedSection,
-                    switchSection,
-                    fotoSection,
-                    sõnumSection,
-                    tervitusSection
-                }
-            };
+                Spacing = 12,
+                Children = { tervitusLabel, pickerBorder, tervitusNupud }
+            }));
 
-            Content = tabelview;
+            leht.Add(new BoxView { HeightRequest = 20, Color = Colors.Transparent });
+
+            Content = new ScrollView { Content = leht };
         }
 
-        Button TeeBtnNupp(string tekst, string värv, EventHandler handler)
+        Border TeeKaart(string pealkiri, Color aktsent, View sisu)
+        {
+            var pealkirjaLabel = new Label
+            {
+                Text = pealkiri,
+                FontSize = 15,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = aktsent,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            var sisu2 = new VerticalStackLayout
+            {
+                Spacing = 0,
+                Children = { pealkirjaLabel, sisu }
+            };
+
+            return new Border
+            {
+                BackgroundColor = kaartVärv,
+                Stroke = Color.FromArgb("#E8E6FF"),
+                StrokeThickness = 1.5,
+                StrokeShape = new RoundRectangle { CornerRadius = new CornerRadius(16) },
+                Padding = new Thickness(16, 14),
+                Shadow = new Shadow
+                {
+                    Brush = new SolidColorBrush(Color.FromArgb("#6C63FF")),
+                    Offset = new Point(0, 4),
+                    Radius = 12,
+                    Opacity = 0.08f
+                },
+                Content = sisu2
+            };
+        }
+
+        Entry TeeEntry(string placeholder, string ikoon, Keyboard keyboard)
+        {
+            return new Entry
+            {
+                Placeholder = $"{ikoon}  {placeholder}",
+                PlaceholderColor = hallVärv,
+                TextColor = tekstVärv,
+                BackgroundColor = taustaVärv,
+                Keyboard = keyboard,
+                FontSize = 14,
+                MinimumHeightRequest = 44
+            };
+        }
+
+        Button TeeNupp(string tekst, Color värv, EventHandler handler)
         {
             var btn = new Button
             {
                 Text = tekst,
-                BackgroundColor = Color.FromArgb(värv),
+                BackgroundColor = värv,
                 TextColor = Colors.White,
-                CornerRadius = 8,
-                FontSize = 12,
-                Padding = new Thickness(10, 6)
+                CornerRadius = 10,
+                FontSize = 13,
+                FontAttributes = FontAttributes.Bold,
+                Padding = new Thickness(14, 10),
+                Shadow = new Shadow
+                {
+                    Brush = new SolidColorBrush(värv),
+                    Offset = new Point(0, 3),
+                    Radius = 8,
+                    Opacity = 0.3f
+                }
             };
             btn.Clicked += handler;
             return btn;
         }
 
-        void Sc_OnChanged(object? sender, ToggledEventArgs e)
+        View TeeNuppMargin(string tekst, Color värv, EventHandler handler)
         {
-            if (ic == null || fotoSection == null || sc == null) return;
+            var btn = TeeNupp(tekst, värv, handler);
+            btn.Margin = new Thickness(0, 4, 8, 4);
+            return btn;
+        }
 
-            if (e.Value)
+        async void TeeFoto_Clicked(object? sender, EventArgs e)
+        {
+            try
             {
-                fotoSection.Title = "Foto:";
-                if (!fotoSection.Contains(ic))
-                    fotoSection.Add(ic);
-                sc.Text = "Peida foto";
+                if (!MediaPicker.Default.IsCaptureSupported)
+                {
+                    await DisplayAlertAsync("Viga", "Kaamera pole toetatud sellel seadmel", "OK");
+                    return;
+                }
+                var photo = await MediaPicker.Default.CapturePhotoAsync();
+                if (photo == null) return;
+
+                string newFile = System.IO.Path.Combine(FileSystem.AppDataDirectory, photo.FileName);
+                using (var stream = await photo.OpenReadAsync())
+                using (var newStream = System.IO.File.OpenWrite(newFile))
+                    await stream.CopyToAsync(newStream);
+
+                if (fotoImage != null)
+                {
+                    fotoImage.Source = ImageSource.FromFile(newFile);
+                    fotoImage.IsVisible = true;
+                    fotoNähtav = true;
+                }
             }
-            else
+            catch (Exception ex)
             {
-                fotoSection.Title = "";
-                fotoSection.Remove(ic);
-                sc.Text = "Näita fotot";
+                await DisplayAlertAsync("Viga", ex.Message, "OK");
+            }
+        }
+
+        async void ValiGaleriist_Clicked(object? sender, EventArgs e)
+        {
+            try
+            {
+                var photo = await MediaPicker.Default.PickPhotoAsync();
+                if (photo == null) return;
+
+                if (fotoImage != null)
+                {
+                    fotoImage.Source = ImageSource.FromFile(photo.FullPath);
+                    fotoImage.IsVisible = true;
+                    fotoNähtav = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlertAsync("Viga", ex.Message, "OK");
             }
         }
 
         async void Helista_Clicked(object? sender, EventArgs e)
         {
-            string phone = telefonCell?.Text ?? "";
-            if (string.IsNullOrWhiteSpace(phone))
-            {
-                await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK");
-                return;
-            }
-            if (PhoneDialer.Default.IsSupported)
-                PhoneDialer.Default.Open(phone);
-            else
-                await DisplayAlertAsync("Viga", "Helistamine pole toetatud", "OK");
+            string phone = telefonEntry?.Text ?? "";
+            if (string.IsNullOrWhiteSpace(phone)) { await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK"); return; }
+            if (PhoneDialer.Default.IsSupported) PhoneDialer.Default.Open(phone);
+            else await DisplayAlertAsync("Viga", "Helistamine pole toetatud", "OK");
         }
 
         async void Saada_sms_Clicked(object? sender, EventArgs e)
         {
-            string phone = telefonCell?.Text ?? "";
-            string message = sõnumCell?.Text ?? "";
-
-            if (string.IsNullOrWhiteSpace(phone))
-            {
-                await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(message))
-                message = "Tere! Saadan sulle sõnumi.";
-
-            SmsMessage sms = new SmsMessage(message, phone);
-            if (Sms.Default.IsComposeSupported)
-                await Sms.Default.ComposeAsync(sms);
-            else
-                await DisplayAlertAsync("Viga", "SMS saatmine pole toetatud", "OK");
+            string phone = telefonEntry?.Text ?? "";
+            string message = sõnumEntry?.Text ?? "";
+            if (string.IsNullOrWhiteSpace(phone)) { await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK"); return; }
+            if (string.IsNullOrWhiteSpace(message)) message = "Tere! Saadan sulle sõnumi.";
+            var sms = new SmsMessage(message, phone);
+            if (Sms.Default.IsComposeSupported) await Sms.Default.ComposeAsync(sms);
+            else await DisplayAlertAsync("Viga", "SMS pole toetatud", "OK");
         }
 
         async void Saada_email_Clicked(object? sender, EventArgs e)
         {
-            string email = emailCell?.Text ?? "";
-            string nimi = nimeCell?.Text ?? "Sõber";
-            string message = sõnumCell?.Text ?? "";
-
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                await DisplayAlertAsync("Viga", "Sisesta emailiaadress!", "OK");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(message))
-                message = "Tere tulemast!";
-
-            EmailMessage e_mail = new EmailMessage
+            string email = emailEntry?.Text ?? "";
+            string nimi = nimeEntry?.Text ?? "Sõber";
+            string message = sõnumEntry?.Text ?? "";
+            if (string.IsNullOrWhiteSpace(email)) { await DisplayAlertAsync("Viga", "Sisesta emailiaadress!", "OK"); return; }
+            if (string.IsNullOrWhiteSpace(message)) message = "Tere tulemast!";
+            var mail = new EmailMessage
             {
                 Subject = $"Sõnum sõbrale {nimi}",
                 Body = message,
                 BodyFormat = EmailBodyFormat.PlainText,
                 To = new List<string>(new[] { email })
             };
-
-            if (Email.Default.IsComposeSupported)
-                await Email.Default.ComposeAsync(e_mail);
-            else
-                await DisplayAlertAsync("Viga", "Email pole toetatud", "OK");
+            if (Email.Default.IsComposeSupported) await Email.Default.ComposeAsync(mail);
+            else await DisplayAlertAsync("Viga", "Email pole toetatud", "OK");
         }
 
         void ValiTervitus_Clicked(object? sender, EventArgs e)
         {
-            Random rnd = new Random();
+            var rnd = new Random();
             valitudTervitus = tervitused[rnd.Next(tervitused.Count)];
             if (tervitusLabel != null)
+            {
                 tervitusLabel.Text = $"✅ {valitudTervitus}";
+                tervitusLabel.TextColor = roheVärv;
+            }
+            int idx = tervitused.IndexOf(valitudTervitus);
+            if (tervitusPicker != null && idx >= 0)
+                tervitusPicker.SelectedIndex = idx;
         }
 
         async void SaadaTervitusSms_Clicked(object? sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(valitudTervitus))
-            {
-                await DisplayAlertAsync("Viga", "Vali esmalt juhuslik tervitus!", "OK");
-                return;
-            }
-            string phone = telefonCell?.Text ?? "";
-            if (string.IsNullOrWhiteSpace(phone))
-            {
-                await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK");
-                return;
-            }
-            SmsMessage sms = new SmsMessage(valitudTervitus, phone);
-            if (Sms.Default.IsComposeSupported)
-                await Sms.Default.ComposeAsync(sms);
-            else
-                await DisplayAlertAsync("Viga", "SMS pole toetatud", "OK");
+            if (string.IsNullOrWhiteSpace(valitudTervitus)) { await DisplayAlertAsync("Viga", "Vali esmalt tervitus!", "OK"); return; }
+            string phone = telefonEntry?.Text ?? "";
+            if (string.IsNullOrWhiteSpace(phone)) { await DisplayAlertAsync("Viga", "Sisesta telefoninumber!", "OK"); return; }
+            var sms = new SmsMessage(valitudTervitus, phone);
+            if (Sms.Default.IsComposeSupported) await Sms.Default.ComposeAsync(sms);
+            else await DisplayAlertAsync("Viga", "SMS pole toetatud", "OK");
         }
 
         async void SaadaTervitusEmail_Clicked(object? sender, EventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(valitudTervitus))
-            {
-                await DisplayAlertAsync("Viga", "Vali esmalt juhuslik tervitus!", "OK");
-                return;
-            }
-            string email = emailCell?.Text ?? "";
-            string nimi = nimeCell?.Text ?? "Sõber";
-            if (string.IsNullOrWhiteSpace(email))
-            {
-                await DisplayAlertAsync("Viga", "Sisesta emailiaadress!", "OK");
-                return;
-            }
-            EmailMessage e_mail = new EmailMessage
+            if (string.IsNullOrWhiteSpace(valitudTervitus)) { await DisplayAlertAsync("Viga", "Vali esmalt tervitus!", "OK"); return; }
+            string email = emailEntry?.Text ?? "";
+            string nimi = nimeEntry?.Text ?? "Sõber";
+            if (string.IsNullOrWhiteSpace(email)) { await DisplayAlertAsync("Viga", "Sisesta emailiaadress!", "OK"); return; }
+            var mail = new EmailMessage
             {
                 Subject = $"🎉 Tervitus sõbrale {nimi}",
                 Body = valitudTervitus,
                 BodyFormat = EmailBodyFormat.PlainText,
                 To = new List<string>(new[] { email })
             };
-            if (Email.Default.IsComposeSupported)
-                await Email.Default.ComposeAsync(e_mail);
-            else
-                await DisplayAlertAsync("Viga", "Email pole toetatud", "OK");
+            if (Email.Default.IsComposeSupported) await Email.Default.ComposeAsync(mail);
+            else await DisplayAlertAsync("Viga", "Email pole toetatud", "OK");
         }
     }
 }
